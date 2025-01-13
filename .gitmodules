@@ -1,0 +1,6 @@
+[submodule "services/feed_app"]
+	path = services/feed_app
+	url = https://github.com/feeddotfun/feed_app.git
+[submodule "services/news_meme_ai"]
+	path = services/news_meme_ai
+	url = https://github.com/feeddotfun/news_meme_ai.git
