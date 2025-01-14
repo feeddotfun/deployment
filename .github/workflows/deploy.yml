@@ -43,15 +43,16 @@ jobs:
         run: |
           # First, ensure the deployment directory exists and clone/pull repo
           ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
-            if [ ! -d "~/deployment" ]; then
-              mkdir -p ~/deployment
-              cd ~/deployment
-              git clone --recursive https://github.com/feeddotfun/deployment.git .
-            else
-              cd ~/deployment
+            mkdir -p ~/deployment
+            cd ~/deployment
+            
+            if [ -d ".git" ]; then
               git fetch --all
               git reset --hard origin/master
               git submodule update --init --recursive
+            else
+              rm -rf * .[^.]*
+              git clone --recursive https://github.com/feeddotfun/deployment.git .
             fi
           ENDSSH
 
