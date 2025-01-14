@@ -1,0 +1,57 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup SSH and ENV
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.DO_HOST }}
+          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
+          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+
+      - name: Deploy to Digital Ocean
+        env:
+          SERVER_HOST: ${{ secrets.DO_HOST }}
+          SERVER_USER: ${{ secrets.DO_USER }}
+        run: |
+          # ENV
+          echo "$FEED_APP_ENV" > services/feed_app/.env.production
+          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
+
+          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+            cd ~/deployment
+            if [ ! -d ".git" ]; then
+              git clone --recursive https://github.com/feeddotfun/deployment.git .
+            fi
+            git fetch --all
+            git reset --hard origin/master
+            git submodule update --init --recursive
+            
+            # ENV copy env files
+            scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
+            scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
+            
+            # Restart service
+            docker compose pull
+            docker compose down --remove-orphans
+            docker compose up -d --build
+            
+            # Clean images
+            docker image prune -f
+          EOF

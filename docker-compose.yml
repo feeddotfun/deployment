@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  feed-app:
+    build: 
+      context: ./services/feed-app
+      dockerfile: Dockerfile
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/feed_app/.env.production
+    environment:
+      - NODE_ENV=production
+      - NEWS_LAB_API_URL=http://news-meme-ai:8000 
+    restart: unless-stopped
+
+  news-meme-ai:
+    build:
+      context: ./services/news_meme_ai
+      dockerfile: Dockerfile
+    networks:
+      - backend 
+    expose:
+      - "8000" 
+    env_file:
+      - ./services/news_meme_ai/.env.production
+    environment:
+      - PYTHON_ENV=production
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:latest
+    networks:
+      - frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - feed-app
+      - ai-service
+    restart: unless-stopped
+
+networks:
+  frontend:
+  backend:
+    internal: true
