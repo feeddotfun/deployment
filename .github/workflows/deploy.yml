@@ -3,6 +3,8 @@ name: Deploy to Server
 on:
   push:
     branches: [ master ]
+  repository_dispatch:
+    types: [feed-app-update, news-meme-ai-update] 
 
 jobs:
   deploy:
@@ -12,6 +14,16 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+
+      - name: Update submodules
+        if: github.event_name == 'repository_dispatch'
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git submodule update --remote --recursive
+          git add .
+          git commit -m "Update submodules" || echo "No changes to commit"
+          git push || echo "No changes to push"
 
       - name: Setup SSH
         env:
@@ -27,21 +39,19 @@ jobs:
         env:
           FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
           NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
-          # Create directories if they don't exist
           mkdir -p services/feed_app
           mkdir -p services/news_meme_ai
-          
-          # Create env files
           echo "$FEED_APP_ENV" > services/feed_app/.env.production
           echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
+          export MONGODB_URI=$MONGODB_URI
 
       - name: Deploy to Digital Ocean
         env:
           SERVER_HOST: ${{ secrets.DO_HOST }}
           SERVER_USER: ${{ secrets.DO_USER }}
         run: |
-          # First, ensure the deployment directory exists and clone/pull repo
           ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
             mkdir -p ~/deployment
             cd ~/deployment
@@ -51,16 +61,13 @@ jobs:
               git reset --hard origin/master
               git submodule update --init --recursive
             else
-              rm -rf * .[^.]*
               git clone --recursive https://github.com/feeddotfun/deployment.git .
             fi
           ENDSSH
 
-          # Copy ENV files to server
           scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
           scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
 
-          # Deploy and restart services
           ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
             cd ~/deployment
             docker compose pull

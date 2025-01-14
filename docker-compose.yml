@@ -10,7 +10,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - /root/deployment/services/feed_app/.env.production
+      - ./services/feed_app/.env.production
     environment:
       - NODE_ENV=production
       - NEWS_LAB_API_URL=http://news-meme-ai:8000 
@@ -25,7 +25,7 @@ services:
     expose:
       - "8000" 
     env_file:
-      - /root/deployment/services/news_meme_ai/.env.production
+      - ./services/news_meme_ai/.env.production
     environment:
       - PYTHON_ENV=production
     restart: unless-stopped
