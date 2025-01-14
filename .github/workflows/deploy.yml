@@ -13,45 +13,57 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: Setup SSH and ENV
+      - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
           SERVER_HOST: ${{ secrets.DO_HOST }}
-          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
-          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
 
+      - name: Create ENV files
+        env:
+          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
+          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+        run: |
+          # Create directories if they don't exist
+          mkdir -p services/feed_app
+          mkdir -p services/news_meme_ai
+          
+          # Create env files
+          echo "$FEED_APP_ENV" > services/feed_app/.env.production
+          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
+
       - name: Deploy to Digital Ocean
         env:
           SERVER_HOST: ${{ secrets.DO_HOST }}
           SERVER_USER: ${{ secrets.DO_USER }}
         run: |
-          # ENV
-          echo "$FEED_APP_ENV" > services/feed_app/.env.production
-          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
-
-          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
-            cd ~/deployment
-            if [ ! -d ".git" ]; then
+          # First, ensure the deployment directory exists and clone/pull repo
+          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+            if [ ! -d "~/deployment" ]; then
+              mkdir -p ~/deployment
+              cd ~/deployment
               git clone --recursive https://github.com/feeddotfun/deployment.git .
+            else
+              cd ~/deployment
+              git fetch --all
+              git reset --hard origin/master
+              git submodule update --init --recursive
             fi
-            git fetch --all
-            git reset --hard origin/master
-            git submodule update --init --recursive
-            
-            # ENV copy env files
-            scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
-            scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
-            
-            # Restart service
+          ENDSSH
+
+          # Copy ENV files to server
+          scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
+          scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
+
+          # Deploy and restart services
+          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+            cd ~/deployment
             docker compose pull
             docker compose down --remove-orphans
             docker compose up -d --build
-            
-            # Clean images
             docker image prune -f
-          EOF
+          ENDSSH
