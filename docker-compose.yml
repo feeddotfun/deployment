@@ -36,7 +36,12 @@ services:
   nginx:
     image: nginx:latest
     networks:
-      - frontend
+      frontend:
+        aliases:
+          - nginx
+      backend:
+        aliases:
+          - nginx-internal
     ports:
       - "80:80"
     volumes:
