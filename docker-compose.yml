@@ -24,7 +24,10 @@ services:
       context: ./services/news_meme_ai
       dockerfile: Dockerfile
     networks:
-      - backend 
+      - backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4 
     expose:
       - "8000" 
     env_file:
