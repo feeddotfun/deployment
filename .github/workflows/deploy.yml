@@ -91,17 +91,29 @@ jobs:
            echo "Preparing deployment directory..."
            mkdir -p ~/deployment
            cd ~/deployment
-           
-           if [ -d ".git" ]; then
-             echo "Updating existing repository..."
-             git fetch --all
-             git reset --hard origin/master
-             git submodule foreach 'git checkout main || git checkout master'
-             git submodule update --init --recursive
-           else
-             echo "Cloning repository..."
-             git clone --recursive https://github.com/feeddotfun/deployment.git .
-           fi
+
+           git fetch --all
+           git reset --hard origin/master
+
+           echo "Updating feed_app submodule..."
+           cd services/feed_app
+           git fetch origin
+           git reset --hard origin/main || git reset --hard origin/master
+           git clean -fd
+           cd ../..
+
+           echo "Updating news_meme_ai submodule..."
+           cd services/news_meme_ai
+           git fetch origin
+           git reset --hard origin/main || git reset --hard origin/master
+           git clean -fd
+           cd ../..
+
+           git submodule sync
+           git submodule update --init --recursive --force
+
+           git status
+           git submodule status
          ENDSSH
          
          echo "Copying environment files..."
