@@ -1,11 +1,9 @@
 name: Deploy to Server
-
 on:
   push:
     branches: [ master ]
   repository_dispatch:
     types: [feed-app-update, news-meme-ai-update] 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -14,7 +12,6 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
-
       - name: Update submodules
         if: github.event_name == 'repository_dispatch'
         run: |
@@ -25,7 +22,6 @@ jobs:
           git add .
           git commit -m "Update submodules" || echo "No changes to commit"
           git push || echo "No changes to push"
-
       - name: Create ENV file
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -37,7 +33,6 @@ jobs:
           mkdir -p services/news_meme_ai
           echo "$FEED_APP_ENV" > services/feed_app/.env.production
           echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
-
       - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
@@ -47,7 +42,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
-
       - name: Deploy to Digital Ocean
         env:
           SERVER_HOST: ${{ secrets.DO_HOST }}
@@ -66,15 +60,13 @@ jobs:
               git clone --recursive https://github.com/feeddotfun/deployment.git .
             fi
           ENDSSH
-
           scp .env $SERVER_USER@$SERVER_HOST:~/deployment/.env
           scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
           scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
-
           ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
             cd ~/deployment
             docker compose pull
-            docker compose down
+            docker compose down --remove-orphans
             docker compose up -d --build
             docker image prune -f
           ENDSSH
