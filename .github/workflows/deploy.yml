@@ -92,17 +92,16 @@ jobs:
            mkdir -p ~/deployment
            cd ~/deployment
            
-           git submodule foreach 'git fetch origin && git reset --hard origin/$(git symbolic-ref --short refs/remotes/origin/HEAD | sed "s@^origin/@@") && git clean -fd'
-
-           git fetch --all
-           git reset --hard origin/master
-
-           # sync submodule
-           git submodule sync
-           git submodule update --init --recursive --force
-           git submodule foreach 'git checkout $(git symbolic-ref --short refs/remotes/origin/HEAD | sed "s@^origin/@@")'
-
-           git submodule foreach 'git fetch origin && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
+           if [ -d ".git" ]; then
+             echo "Updating existing repository..."
+             git fetch --all
+             git reset --hard origin/master
+             git submodule foreach 'git checkout main || git checkout master'
+             git submodule update --init --recursive
+           else
+             echo "Cloning repository..."
+             git clone --recursive https://github.com/feeddotfun/deployment.git .
+           fi
          ENDSSH
          
          echo "Copying environment files..."
