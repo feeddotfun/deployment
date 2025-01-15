@@ -92,15 +92,17 @@ jobs:
            mkdir -p ~/deployment
            cd ~/deployment
            
-           git submodule foreach 'git reset --hard && git clean -fd'
+           git submodule foreach 'git fetch origin && git reset --hard origin/$(git symbolic-ref --short refs/remotes/origin/HEAD | sed "s@^origin/@@") && git clean -fd'
 
            git fetch --all
            git reset --hard origin/master
 
            # sync submodule
            git submodule sync
-           git submodule update --init --recursive
+           git submodule update --init --recursive --force
            git submodule foreach 'git checkout $(git symbolic-ref --short refs/remotes/origin/HEAD | sed "s@^origin/@@")'
+
+           git submodule foreach 'git fetch origin && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
          ENDSSH
          
          echo "Copying environment files..."
