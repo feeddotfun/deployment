@@ -25,6 +25,18 @@ jobs:
           git commit -m "Update submodules" || echo "No changes to commit"
           git push || echo "No changes to push"
 
+      - name: Create ENV file
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
+          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+        run: |
+          echo "MONGODB_URI=$MONGODB_URI" > .env
+          mkdir -p services/feed_app
+          mkdir -p services/news_meme_ai
+          echo "$FEED_APP_ENV" > services/feed_app/.env.production
+          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
+
       - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
@@ -34,27 +46,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
-
-      - name: Create ENV files
-        env:
-          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
-          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: |
-          mkdir -p services/feed_app
-          mkdir -p services/news_meme_ai
-          echo "$FEED_APP_ENV" > services/feed_app/.env.production
-          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
-          echo "MONGODB_URI=$MONGODB_URI" >> services/feed_app/.env.production
-
-      - name: Build and Push Feed App
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: |
-          cd services/feed_app
-          docker build \
-            --build-arg MONGODB_URI="$MONGODB_URI" \
-            -t feed-app:latest .
 
       - name: Deploy to Digital Ocean
         env:
@@ -74,6 +65,7 @@ jobs:
             fi
           ENDSSH
 
+          scp .env $SERVER_USER@$SERVER_HOST:~/deployment/.env
           scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
           scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
 
