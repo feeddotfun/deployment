@@ -89,8 +89,16 @@ jobs:
          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
            set -e  # Exit on any error
            echo "Preparing deployment directory..."
-           mkdir -p ~/deployment
-           cd ~/deployment
+           if [ ! -d "~/deployment/.git" ]; then
+              echo "Git repository not found. Creating new..."
+              rm -rf ~/deployment
+              mkdir -p ~/deployment
+              cd ~/deployment
+              git clone --recursive https://github.com/feeddotfun/deployment.git .
+            else
+              echo "Git repository exists. Updating..."
+              cd ~/deployment
+            fi
 
            git fetch --all
            git reset --hard origin/master
