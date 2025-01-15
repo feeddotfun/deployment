@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile
     networks:
       - backend
+      - internet
     dns:
       - 8.8.8.8
       - 8.8.4.4 
@@ -58,3 +59,4 @@ networks:
   frontend:
   backend:
     internal: true
+  internet:
