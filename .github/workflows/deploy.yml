@@ -1,72 +1,120 @@
 name: Deploy to Server
 on:
-  push:
-    branches: [ master ]
-  repository_dispatch:
-    types: [feed-app-update, news-meme-ai-update] 
+ push:
+   branches: [ master ]
+ repository_dispatch:
+   types: [feed-app-update, news-meme-ai-update] 
+
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-          fetch-depth: 0
-      - name: Update submodules
-        if: github.event_name == 'repository_dispatch'
-        run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
-          git submodule foreach 'git checkout main || git checkout master'
-          git submodule update --remote --recursive
-          git add .
-          git commit -m "Update submodules" || echo "No changes to commit"
-          git push || echo "No changes to push"
-      - name: Create ENV file
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
-          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
-        run: |
-          echo "MONGODB_URI=$MONGODB_URI" > .env
-          mkdir -p services/feed_app
-          mkdir -p services/news_meme_ai
-          echo "$FEED_APP_ENV" > services/feed_app/.env.production
-          echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
-      - name: Setup SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
-          SERVER_HOST: ${{ secrets.DO_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
-      - name: Deploy to Digital Ocean
-        env:
-          SERVER_HOST: ${{ secrets.DO_HOST }}
-          SERVER_USER: ${{ secrets.DO_USER }}
-        run: |
-          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
-            mkdir -p ~/deployment
-            cd ~/deployment
-            
-            if [ -d ".git" ]; then
-              git fetch --all
-              git reset --hard origin/master
-              git submodule foreach 'git checkout main || git checkout master'
-              git submodule update --init --recursive
-            else
-              git clone --recursive https://github.com/feeddotfun/deployment.git .
-            fi
-          ENDSSH
-          scp .env $SERVER_USER@$SERVER_HOST:~/deployment/.env
-          scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
-          scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
-          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
-            cd ~/deployment
-            docker compose pull
-            docker compose down --remove-orphans
-            docker compose up -d --build
-            docker image prune -f
-          ENDSSH
+ deploy:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v3
+       with:
+         submodules: true
+         fetch-depth: 0
+
+     - name: Update submodules
+       if: github.event_name == 'repository_dispatch'
+       run: |
+         git config --global user.name 'GitHub Actions'
+         git config --global user.email 'actions@github.com'
+         git submodule sync
+         git submodule update --init --recursive
+         git submodule foreach 'git fetch origin && git checkout $(git rev-parse --abbrev-ref HEAD) && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
+         git add .
+         git diff --staged --quiet || git commit -m "Update submodules"
+         git push || echo "No changes to push"
+
+     - name: Create ENV file
+       env:
+         MONGODB_URI: ${{ secrets.MONGODB_URI }}
+         FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
+         NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+       run: |
+         if [ -z "$MONGODB_URI" ]; then
+           echo "Error: MONGODB_URI is not set"
+           exit 1
+         fi
+         
+         echo "MONGODB_URI=$MONGODB_URI" > .env
+         mkdir -p services/feed_app
+         mkdir -p services/news_meme_ai
+         
+         if [ -z "$FEED_APP_ENV" ]; then
+           echo "Error: FEED_APP_ENV is not set"
+           exit 1
+         fi
+         echo "$FEED_APP_ENV" > services/feed_app/.env.production
+         
+         if [ -z "$NEWS_MEME_AI_ENV" ]; then
+           echo "Error: NEWS_MEME_AI_ENV is not set"
+           exit 1
+         fi
+         echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
+
+     - name: Setup SSH
+       env:
+         SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+         SERVER_HOST: ${{ secrets.DO_HOST }}
+         SERVER_USER: ${{ secrets.DO_USER }}
+       run: |
+         if [ -z "$SSH_PRIVATE_KEY" ]; then
+           echo "Error: SSH_PRIVATE_KEY is not set"
+           exit 1
+         fi
+         
+         mkdir -p ~/.ssh
+         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+         chmod 600 ~/.ssh/id_rsa
+         ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+         
+         # Test SSH connection
+         if ! ssh -q $SERVER_USER@$SERVER_HOST exit; then
+           echo "Error: SSH connection failed"
+           exit 1
+         fi
+
+     - name: Deploy to Digital Ocean
+       env:
+         SERVER_HOST: ${{ secrets.DO_HOST }}
+         SERVER_USER: ${{ secrets.DO_USER }}
+       run: |
+         echo "Starting deployment..."
+         
+         ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+           set -e  # Exit on any error
+           echo "Preparing deployment directory..."
+           mkdir -p ~/deployment
+           cd ~/deployment
+           
+           if [ -d ".git" ]; then
+             echo "Updating existing repository..."
+             git fetch --all
+             git reset --hard origin/master
+             git submodule foreach 'git checkout main || git checkout master'
+             git submodule update --init --recursive
+           else
+             echo "Cloning repository..."
+             git clone --recursive https://github.com/feeddotfun/deployment.git .
+           fi
+         ENDSSH
+         
+         echo "Copying environment files..."
+         scp .env $SERVER_USER@$SERVER_HOST:~/deployment/.env
+         scp services/feed_app/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/feed_app/.env.production
+         scp services/news_meme_ai/.env.production $SERVER_USER@$SERVER_HOST:~/deployment/services/news_meme_ai/.env.production
+         
+         ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+           set -e  # Exit on any error
+           cd ~/deployment
+           echo "Pulling latest Docker images..."
+           docker compose pull
+           echo "Stopping existing containers..."
+           docker compose down --remove-orphans
+           echo "Starting new containers..."
+           docker compose up -d --build
+           echo "Cleaning up old images..."
+           docker image prune -f
+           echo "Deployment completed successfully!"
+         ENDSSH
