@@ -13,18 +13,22 @@ jobs:
        with:
          submodules: true
          fetch-depth: 0
+         token: ${{ secrets.GH_PAT }}
 
      - name: Update submodules
        if: github.event_name == 'repository_dispatch'
+       env:
+          GH_PAT: ${{ secrets.GH_PAT }}
        run: |
-         git config --global user.name 'GitHub Actions'
-         git config --global user.email 'actions@github.com'
-         git submodule sync
-         git submodule update --init --recursive
-         git submodule foreach 'git fetch origin && git checkout $(git rev-parse --abbrev-ref HEAD) && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
-         git add .
-         git diff --staged --quiet || git commit -m "Update submodules"
-         git push || echo "No changes to push"
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/feeddotfun/deployment.git
+          git submodule sync
+          git submodule update --init --recursive
+          git submodule foreach 'git fetch origin && git checkout $(git rev-parse --abbrev-ref HEAD) && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
+          git add .
+          git diff --staged --quiet || git commit -m "Update submodules"
+          git push || echo "No changes to push"
 
      - name: Create ENV file
        env:
