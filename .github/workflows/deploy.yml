@@ -35,6 +35,9 @@ jobs:
          MONGODB_URI: ${{ secrets.MONGODB_URI }}
          FEED_APP_ENV: ${{ secrets.FEED_APP_ENV }}
          NEWS_MEME_AI_ENV: ${{ secrets.NEWS_MEME_AI_ENV }}
+         NEXT_PUBLIC_RPC_URL: ${{ secrets.NEXT_PUBLIC_RPC_URL }}
+         NEXT_PUBLIC_UPLOAD_API_URL: ${{ secrets.NEXT_PUBLIC_UPLOAD_API_URL }}
+         NEXT_PUBLIC_UPLOAD_API_KEY: ${{ secrets.NEXT_PUBLIC_UPLOAD_API_KEY }}
        run: |
          if [ -z "$MONGODB_URI" ]; then
            echo "Error: MONGODB_URI is not set"
@@ -42,10 +45,9 @@ jobs:
          fi
          
          echo "MONGODB_URI=$MONGODB_URI" > .env
-         echo "NEXT_PUBLIC_RPC_URL=$=NEXT_PUBLIC_RPC_URL" > .env
-         echo "NEXT_PUBLIC_UPLOAD_API_URL=$=NEXT_PUBLIC_UPLOAD_API_URL" > .env
-         echo "NEXT_PUBLIC_UPLOAD_API_KEY=$=NEXT_PUBLIC_UPLOAD_API_KEY" > .env
-
+         echo "NEXT_PUBLIC_RPC_URL=${NEXT_PUBLIC_RPC_URL}" >> .env
+         echo "NEXT_PUBLIC_UPLOAD_API_URL=${NEXT_PUBLIC_UPLOAD_API_URL}" >> .env
+         echo "NEXT_PUBLIC_UPLOAD_API_KEY=${NEXT_PUBLIC_UPLOAD_API_KEY}" >> .env
 
          mkdir -p services/feed_app
          mkdir -p services/news_meme_ai
