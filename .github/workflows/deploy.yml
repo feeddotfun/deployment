@@ -45,7 +45,16 @@ jobs:
           mkdir -p services/news_meme_ai
           echo "$FEED_APP_ENV" > services/feed_app/.env.production
           echo "$NEWS_MEME_AI_ENV" > services/news_meme_ai/.env.production
-          export MONGODB_URI=$MONGODB_URI
+          echo "MONGODB_URI=$MONGODB_URI" >> services/feed_app/.env.production
+
+      - name: Build and Push Feed App
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          cd services/feed_app
+          docker build \
+            --build-arg MONGODB_URI="$MONGODB_URI" \
+            -t feed-app:latest .
 
       - name: Deploy to Digital Ocean
         env:
