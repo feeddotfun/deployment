@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: true
+          submodules: recursive
           fetch-depth: 0
 
       - name: Update submodules
@@ -20,7 +20,7 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git submodule update --remote --recursive
+          git submodule update --remote --recursive --force
           git add .
           git commit -m "Update submodules" || echo "No changes to commit"
           git push || echo "No changes to push"
@@ -56,12 +56,17 @@ jobs:
             mkdir -p ~/deployment
             cd ~/deployment
             
+            # Force pull latest changes
             if [ -d ".git" ]; then
               git fetch --all
               git reset --hard origin/master
-              git submodule update --init --recursive
+              
+              # Force update submodules
+              git submodule foreach --recursive git reset --hard
+              git submodule update --init --recursive --force
             else
               git clone --recursive https://github.com/feeddotfun/deployment.git .
+              git submodule update --init --recursive --force
             fi
           ENDSSH
 
@@ -71,8 +76,15 @@ jobs:
 
           ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
             cd ~/deployment
-            docker compose pull
+            
+            # Clean Docker cache
             docker compose down --remove-orphans
-            docker compose up -d --build
+            docker system prune -af --volumes
+            
+            # Rebuild and start
+            docker compose pull
+            docker compose up -d --build --force-recreate
+            
+            # Clean up old images
             docker image prune -f
           ENDSSH
