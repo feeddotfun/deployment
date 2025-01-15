@@ -42,6 +42,11 @@ jobs:
          fi
          
          echo "MONGODB_URI=$MONGODB_URI" > .env
+         echo "NEXT_PUBLIC_RPC_URL=$=NEXT_PUBLIC_RPC_URL" > .env
+         echo "NEXT_PUBLIC_UPLOAD_API_URL=$=NEXT_PUBLIC_UPLOAD_API_URL" > .env
+         echo "NEXT_PUBLIC_UPLOAD_API_KEY=$=NEXT_PUBLIC_UPLOAD_API_KEY" > .env
+
+
          mkdir -p services/feed_app
          mkdir -p services/news_meme_ai
          
