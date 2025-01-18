@@ -1,7 +1,7 @@
 name: Deploy to Server
 on:
  push:
-   branches: [ master ]
+   branches: [ production ]
  repository_dispatch:
    types: [feed-app-update, news-meme-ai-update] 
 
@@ -110,19 +110,19 @@ jobs:
             fi
 
            git fetch --all
-           git reset --hard origin/master
+           git reset --hard origin/production
 
            echo "Updating feed_app submodule..."
            cd services/feed_app
            git fetch origin
-           git reset --hard origin/main || git reset --hard origin/master
+           git reset --hard origin/production
            git clean -fd
            cd ../..
 
            echo "Updating news_meme_ai submodule..."
            cd services/news_meme_ai
            git fetch origin
-           git reset --hard origin/main || git reset --hard origin/master
+           git reset --hard origin/production
            git clean -fd
            cd ../..
 
@@ -141,13 +141,25 @@ jobs:
          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
            set -e  # Exit on any error
            cd ~/deployment
-           echo "Pulling latest Docker images..."
+
+           echo "Building and pulling latest Docker images..."
+           docker compose build
            docker compose pull
-           echo "Stopping existing containers..."
+           
+           echo "Starting new containers while existing containers are running..."
+           docker compose up -d --no-deps --scale feed_app=2 --scale news_meme_ai=2 --no-recreate
+           
+           echo "Waiting for new containers to be ready..."
+           sleep 30
+           
+           echo "Removing old containers..."
            docker compose down --remove-orphans
-           echo "Starting new containers..."
+           
+           echo "Starting final containers..."
            docker compose up -d --build
+           
            echo "Cleaning up old images..."
            docker image prune -f
+           
            echo "Deployment completed successfully!"
          ENDSSH
