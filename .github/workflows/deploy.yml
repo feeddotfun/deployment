@@ -147,7 +147,7 @@ jobs:
            docker compose pull
            
            echo "Starting new containers while existing containers are running..."
-           docker compose up -d --no-deps --scale feed_app=2 --scale news_meme_ai=2 --no-recreate
+           docker compose up -d --no-deps --scale feed-app=2 --scale news-meme-ai=2 --no-recreate
            
            echo "Waiting for new containers to be ready..."
            sleep 30
