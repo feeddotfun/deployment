@@ -142,15 +142,9 @@ jobs:
            set -e  # Exit on any error
            cd ~/deployment
 
-           echo "Building and pulling latest Docker images..."
-           docker compose build
+           echo "Pulling and building latest Docker images..."
            docker compose pull
-           
-           echo "Starting new containers while existing containers are running..."
-           docker compose up -d --no-deps --scale feed-app=2 --scale news-meme-ai=2 --no-recreate
-           
-           echo "Waiting for new containers to be ready..."
-           sleep 30
+           docker compose build
            
            echo "Removing old containers..."
            docker compose down --remove-orphans
