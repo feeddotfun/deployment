@@ -23,12 +23,19 @@ jobs:
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git remote set-url origin https://x-access-token:${GH_PAT}@github.com/feeddotfun/deployment.git
-          git submodule sync
-          git submodule update --init --recursive
-          git submodule foreach 'git fetch origin && git checkout $(git rev-parse --abbrev-ref HEAD) && git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)'
+
+          # Force update submodules to latest commit
+          git submodule foreach --recursive '
+            git fetch origin production
+            git checkout production
+            git reset --hard origin/production
+            git clean -fd
+          '
+          
+          # Update the parent repo's reference to the submodules
           git add .
-          git diff --staged --quiet || git commit -m "Update submodules"
-          git push || echo "No changes to push"
+          git diff --staged --quiet || git commit -m "Update submodules to latest commit"
+          git push origin production || echo "No changes to push"
 
      - name: Create ENV file
        env:
@@ -109,27 +116,10 @@ jobs:
               cd ~/deployment
             fi
 
-           git fetch --all
-           git reset --hard origin/production
-
-           echo "Updating feed_app submodule..."
-           cd services/feed_app
            git fetch origin
            git reset --hard origin/production
-           git clean -fd
-           cd ../..
-
-           echo "Updating news_meme_ai submodule..."
-           cd services/news_meme_ai
-           git fetch origin
-           git reset --hard origin/production
-           git clean -fd
-           cd ../..
-
-           git submodule sync
            git submodule update --init --recursive --force
 
-           git status
            git submodule status
          ENDSSH
          
@@ -142,17 +132,10 @@ jobs:
            set -e  # Exit on any error
            cd ~/deployment
 
-           echo "Pulling and building latest Docker images..."
-           docker compose pull
-           docker compose build
-           
-           echo "Removing old containers..."
+           echo "Deploying with Docker..."
            docker compose down --remove-orphans
-           
-           echo "Starting final containers..."
-           docker compose up -d --build
-           
-           echo "Cleaning up old images..."
+           docker compose pull           
+           docker compose up -d --build      
            docker image prune -f
            
            echo "Deployment completed successfully!"
